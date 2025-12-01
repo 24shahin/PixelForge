@@ -167,11 +167,11 @@ const Index = () => {
             transition={{ delay: 0.6, duration: 0.8 }}
             className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto"
           >
-            {[
-              'https://images.unsplash.com/photo-1686903431112-9b426ee61dad?w=300&h=300&fit=crop',
-              'https://images.unsplash.com/photo-1675426513962-63c6022dfc68?w=300&h=300&fit=crop',
-              'https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=300&h=300&fit=crop',
-              'https://images.unsplash.com/photo-1699116548123-84d2a8839ced?w=300&h=300&fit=crop',
+          {[
+              'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=300&h=300&fit=crop',
+              'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?w=300&h=300&fit=crop',
+              'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=300&fit=crop',
+              'https://images.unsplash.com/photo-1633412802994-5c058f151b66?w=300&h=300&fit=crop',
             ].map((src, index) => (
               <motion.div
                 key={index}
