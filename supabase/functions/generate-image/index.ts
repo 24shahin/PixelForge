@@ -5,8 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const WEBHOOK_URL = 'https://n8n.srv1106977.hstgr.cloud/webhook/a573f515-8454-49a3-b6f8-eba9621dff71';
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -25,40 +23,86 @@ serve(async (req) => {
       );
     }
 
-    console.log('Calling webhook:', WEBHOOK_URL);
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      console.error('LOVABLE_API_KEY is not configured');
+      return new Response(
+        JSON.stringify({ error: 'API key not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    const response = await fetch(WEBHOOK_URL, {
+    console.log('Calling Lovable AI for image generation...');
+
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        prompt,
-        userId,
-        userName,
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: `Generate an image: ${prompt}`
+          }
+        ],
+        modalities: ['image', 'text']
       }),
     });
 
-    console.log('Webhook response status:', response.status);
+    console.log('AI response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Webhook error:', errorText);
+      console.error('AI API error:', errorText);
+      
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: 'Payment required. Please add credits to continue.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       return new Response(
-        JSON.stringify({ 
-          error: 'Webhook request failed', 
-          details: errorText,
-          status: response.status 
-        }),
+        JSON.stringify({ error: 'Failed to generate image', details: errorText }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const data = await response.json();
-    console.log('Webhook response data:', data);
+    console.log('AI response received');
+
+    // Extract image from response
+    const message = data.choices?.[0]?.message;
+    const imageUrl = message?.images?.[0]?.image_url?.url;
+    const textContent = message?.content || 'Here\'s your generated image!';
+
+    if (!imageUrl) {
+      console.error('No image in response:', JSON.stringify(data));
+      return new Response(
+        JSON.stringify({ 
+          error: 'No image was generated',
+          message: textContent 
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Image generated successfully');
 
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify({
+        imageUrl: imageUrl,
+        message: textContent
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
