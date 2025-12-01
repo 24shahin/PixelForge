@@ -18,7 +18,9 @@ import {
   Crown,
   AlertCircle
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import axios from 'axios';
+
+const WEBHOOK_URL = 'https://n8n.srv1106977.hstgr.cloud/webhook/a573f515-8454-49a3-b6f8-eba9621dff71';
 
 interface Message {
   id: string;
@@ -28,8 +30,6 @@ interface Message {
   timestamp: Date;
   isLoading?: boolean;
 }
-
-// Image generation is now handled via edge function
 
 const Chat = () => {
   const { user, incrementImages } = useAuth();
@@ -107,22 +107,17 @@ const Chat = () => {
     setIsGenerating(true);
 
     try {
-      // Call edge function
-      const { data, error } = await supabase.functions.invoke('generate-image', {
-        body: {
-          prompt: input,
-          userId: user.id,
-          userName: user.name,
-        },
+      // Call n8n webhook directly with axios
+      const response = await axios.post(WEBHOOK_URL, {
+        prompt: input,
+        userId: user.id,
+        userName: user.name,
       });
 
       let imageUrl: string | undefined;
       let responseText = '';
 
-      if (error) {
-        console.error('Edge function error:', error);
-        throw new Error(error.message || 'Failed to generate image');
-      }
+      const data = response.data;
 
       if (data) {
         imageUrl = data.imageUrl || data.image || data.url;
@@ -168,16 +163,17 @@ const Chat = () => {
       let errorMessage = 'Sorry, there was an error generating your image.';
       let errorDescription = 'Please try again or contact support.';
       
-      if (error instanceof Error) {
-        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      if (axios.isAxiosError(error)) {
+        if (error.code === 'ERR_NETWORK') {
           errorMessage = 'Unable to connect to the image generation service.';
           errorDescription = 'Please check your internet connection and try again.';
-        } else if (error.message.includes('timeout')) {
-          errorMessage = 'The request timed out.';
-          errorDescription = 'The server took too long to respond. Please try again.';
+        } else if (error.response) {
+          errorDescription = error.response.data?.message || error.message;
         } else {
           errorDescription = error.message;
         }
+      } else if (error instanceof Error) {
+        errorDescription = error.message;
       }
       
       // Remove loading message and add error
