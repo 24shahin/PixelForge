@@ -160,6 +160,22 @@ const Chat = () => {
     } catch (error) {
       console.error('Error generating image:', error);
       
+      // Build detailed error message
+      let errorMessage = 'Sorry, there was an error generating your image.';
+      let errorDescription = 'Please try again or contact support.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          errorMessage = 'Unable to connect to the image generation service.';
+          errorDescription = 'Please check your internet connection and try again.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'The request timed out.';
+          errorDescription = 'The server took too long to respond. Please try again.';
+        } else {
+          errorDescription = error.message;
+        }
+      }
+      
       // Remove loading message and add error
       setMessages((prev) => {
         const filtered = prev.filter((m) => m.id !== loadingMessage.id);
@@ -168,14 +184,14 @@ const Chat = () => {
           {
             id: crypto.randomUUID(),
             role: 'assistant',
-            content: 'Sorry, there was an error generating your image. Please try again.',
+            content: errorMessage,
             timestamp: new Date(),
           },
         ];
       });
 
       toast.error('Generation failed', {
-        description: 'Please try again or contact support.',
+        description: errorDescription,
       });
     } finally {
       setIsGenerating(false);
