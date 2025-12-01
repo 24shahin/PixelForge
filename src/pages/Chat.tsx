@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
-const WEBHOOK_URL = 'https://n8n.srv1106977.hstgr.cloud/webhook/a573f515-8454-49a3-b6f8-eba9621dff71';
+const WEBHOOK_URL = 'https://n8n.srv1106977.hstgr.cloud/webhook-test/a573f515-8454-49a3-b6f8-eba9621dff71';
 
 interface Message {
   id: string;
