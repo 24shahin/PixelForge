@@ -18,6 +18,7 @@ import {
   Crown,
   AlertCircle
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: string;
@@ -28,7 +29,7 @@ interface Message {
   isLoading?: boolean;
 }
 
-const WEBHOOK_URL = 'https://n8n.srv1106977.hstgr.cloud/webhook/a573f515-8454-49a3-b6f8-eba9621dff71';
+// Image generation is now handled via edge function
 
 const Chat = () => {
   const { user, incrementImages } = useAuth();
@@ -106,30 +107,33 @@ const Chat = () => {
     setIsGenerating(true);
 
     try {
-      // Call webhook
-      const response = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Call edge function
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: {
           prompt: input,
           userId: user.id,
           userName: user.name,
-        }),
+        },
       });
 
       let imageUrl: string | undefined;
       let responseText = '';
 
-      if (response.ok) {
-        const data = await response.json();
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to generate image');
+      }
+
+      if (data) {
         imageUrl = data.imageUrl || data.image || data.url;
         responseText = data.message || 'Here\'s your generated image!';
+        
+        if (!imageUrl) {
+          console.log('Webhook response:', data);
+          responseText = 'The image generation service responded but no image was returned. Please check your n8n workflow.';
+        }
       } else {
-        responseText = 'I created an image based on your prompt. Here it is!';
-        // For demo purposes, use a placeholder if webhook fails
-        imageUrl = `https://picsum.photos/seed/${Date.now()}/512/512`;
+        responseText = 'No response from image generation service.';
       }
 
       // Increment image count
