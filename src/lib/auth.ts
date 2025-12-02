@@ -5,6 +5,7 @@ export interface User {
   name: string;
   imagesGenerated: number;
   isPremium: boolean;
+  lastResetDate?: string; // Date string for tracking daily reset
 }
 
 const USERS_KEY = 'pixelforge_users';
@@ -20,9 +21,53 @@ export const saveUsers = (users: User[]) => {
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
 };
 
+// Get current date in Bangladeshi timezone (UTC+6) at 12:00 AM
+const getBangladeshiMidnight = (): Date => {
+  const now = new Date();
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const bdTime = new Date(utcTime + (6 * 3600000)); // UTC+6
+  bdTime.setHours(0, 0, 0, 0);
+  return bdTime;
+};
+
+const shouldResetCounter = (user: User): boolean => {
+  if (!user.lastResetDate) return true;
+  
+  const lastReset = new Date(user.lastResetDate);
+  const currentMidnight = getBangladeshiMidnight();
+  
+  return lastReset < currentMidnight;
+};
+
+const resetUserCounter = (user: User): User => {
+  return {
+    ...user,
+    imagesGenerated: 0,
+    lastResetDate: getBangladeshiMidnight().toISOString()
+  };
+};
+
 export const getCurrentUser = (): User | null => {
   const user = localStorage.getItem(CURRENT_USER_KEY);
-  return user ? JSON.parse(user) : null;
+  if (!user) return null;
+  
+  let parsedUser: User = JSON.parse(user);
+  
+  // Check if counter needs to be reset
+  if (!parsedUser.isPremium && shouldResetCounter(parsedUser)) {
+    parsedUser = resetUserCounter(parsedUser);
+    setCurrentUser(parsedUser);
+    
+    // Also update in users array
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.id === parsedUser.id);
+    if (userIndex !== -1) {
+      users[userIndex] = parsedUser;
+      saveUsers(users);
+    }
+  }
+  
+  return parsedUser;
 };
 
 export const setCurrentUser = (user: User | null) => {
@@ -46,6 +91,7 @@ export const register = (email: string, password: string, name: string): { succe
     name,
     imagesGenerated: 0,
     isPremium: false,
+    lastResetDate: getBangladeshiMidnight().toISOString(),
   };
 
   // Store password separately (in real app, this would be hashed)
@@ -91,11 +137,19 @@ export const incrementImageCount = (userId: string): User | null => {
   
   if (userIndex === -1) return null;
 
-  users[userIndex].imagesGenerated += 1;
-  saveUsers(users);
-  setCurrentUser(users[userIndex]);
+  let user = users[userIndex];
   
-  return users[userIndex];
+  // Check if counter needs to be reset before incrementing
+  if (!user.isPremium && shouldResetCounter(user)) {
+    user = resetUserCounter(user);
+  }
+  
+  user.imagesGenerated += 1;
+  users[userIndex] = user;
+  saveUsers(users);
+  setCurrentUser(user);
+  
+  return user;
 };
 
 export const getRemainingFreeImages = (user: User): number => {
