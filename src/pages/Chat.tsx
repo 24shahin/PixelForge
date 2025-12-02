@@ -107,28 +107,37 @@ const Chat = () => {
     setIsGenerating(true);
 
     try {
-      // Call n8n webhook directly with axios
+      // Call n8n webhook directly with axios - expect binary response
       const response = await axios.post(WEBHOOK_URL, {
         prompt: input,
         userId: user.id,
         userName: user.name,
+      }, {
+        responseType: 'blob', // Expect binary image data
       });
 
       let imageUrl: string | undefined;
       let responseText = '';
 
-      const data = response.data;
-
-      if (data) {
-        imageUrl = data.imageUrl || data.image || data.url;
-        responseText = data.message || 'Here\'s your generated image!';
-        
-        if (!imageUrl) {
-          console.log('Webhook response:', data);
-          responseText = 'The image generation service responded but no image was returned. Please check your n8n workflow.';
-        }
+      // Check if response is a blob (binary image)
+      if (response.data instanceof Blob) {
+        // Create a blob URL from the binary data
+        imageUrl = URL.createObjectURL(response.data);
+        responseText = 'Here\'s your generated image!';
       } else {
-        responseText = 'No response from image generation service.';
+        // Fallback: try to handle JSON response
+        const data = response.data;
+        if (data) {
+          imageUrl = data.imageUrl || data.image || data.url;
+          responseText = data.message || 'Here\'s your generated image!';
+          
+          if (!imageUrl) {
+            console.log('Webhook response:', data);
+            responseText = 'The image generation service responded but no image was returned. Please check your n8n workflow.';
+          }
+        } else {
+          responseText = 'No response from image generation service.';
+        }
       }
 
       // Increment image count
